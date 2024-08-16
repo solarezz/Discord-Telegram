@@ -9,9 +9,9 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.dispatcher import FSMContext
 
-ds_token = input("ds_token:")
+ds_token = input('DS_token: ')
 
-tg_token = input("tg_token:")
+tg_token = input('tg_token: ')
 
 intents = disnake.Intents.default().all()
 
@@ -61,11 +61,11 @@ async def notifications(message: types.Message):
 @dp.message_handler(state=Form.switch_notifications)
 async def process_switch_notifications(message: types.Message, state: FSMContext):
     server_name = message.text
-    check_not = await db.check_notifications(server_name)
-    server_id = check_not[1]
-    print(type(server_id))
-    if check_not[0][0] == "Выключены":
-        await db.update_notif(notifications="Включены", user_id_tg=message.chat.id, server_id=check_not[1])
+    server_id = await db.get_server_id(server_name=server_name)
+    check_not = await db.check_notifications(server_id=server_id, user_id_telegram=message.chat.id)
+    print(check_not[0])
+    if check_not[0] == "Выключены":
+        await db.update_notif(notifications="Включены", user_id_tg=message.chat.id, server_id=server_id)
         kb = [
             [
                 types.KeyboardButton(text="/notifications"),
@@ -73,8 +73,9 @@ async def process_switch_notifications(message: types.Message, state: FSMContext
         ]
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, keyboard=kb)
         await tg.send_message(message.chat.id, "[🟢] Вы включили уведомления с дискорда!", reply_markup=markup)
-    elif check_not[0][0] == 'Включены':
-        await db.update_notif(notifications="Выключены", user_id_tg=message.chat.id, server_id=check_not[1])
+        await state.finish()
+    elif check_not[0] == 'Включены':
+        await db.update_notif(notifications="Выключены", user_id_tg=message.chat.id, server_id=server_id)
         kb = [
             [
                 types.KeyboardButton(text="/notifications"),
@@ -82,9 +83,10 @@ async def process_switch_notifications(message: types.Message, state: FSMContext
         ]
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, keyboard=kb)
         await tg.send_message(message.chat.id, "[🔴] Вы выключили уведомления с дискорда!", reply_markup=markup)
+        await state.finish()
     else:
-        await tg.send_message("[⛔] Вы не зарегистрированы. Напишите /start для регистрации!")
-    await state.finish()
+        await tg.send_message(message.chat.id, "[⛔] Вы не зарегистрированы. Напишите /start для регистрации!")
+        await state.finish()
 
 
 @dp.message_handler(commands=['sendall'])
@@ -119,7 +121,7 @@ async def message_in_discord(message: types.Message):
         user_text = message.text
         await on_ready(name=message.from_user.username, message=user_text, channel_id=server_id)
         await db.update_last_msg(user_telegram_id=message.chat.id, last_msg=0)
-        markup = types.ReplyKeyboardRemove()
+        types.ReplyKeyboardRemove()
         kb = [
             [
                 types.KeyboardButton(text="/notifications"),
@@ -134,15 +136,6 @@ async def message_in_discord(message: types.Message):
         markup.add(*buttons)
         await message.answer("[⚖️] Выберите сервер куда хотите написать!", reply_markup=markup)
 
-@ds.event
-async def on_message(message):
-    if message.author == ds.user:
-        return
-
-    user_list = await db.get_id_notifications()
-
-    for userid in user_list:
-        await tg.send_message(userid, f'{message.author}:\n{message.content}')
 
 @ds.event
 async def on_ready(name, message, channel_id):
@@ -154,16 +147,46 @@ async def on_ready(name, message, channel_id):
     await channel.send(embed=embed)
 
 
+@ds.event
+async def on_message(message):
+    if message.author == ds.user:
+        return
+
+    user_list = await db.get_id_notifications()
+    server_id = message.guild.id
+
+    for userid in user_list:
+        print(userid)
+        checker = await db.check_notifications(server_id=server_id, user_id_telegram=userid)
+        print(checker)
+        if checker[0] == 'Выключены':
+            user_list.remove(userid)
+            print(user_list)
+        else:
+            await tg.send_message(userid, f'{message.author}:\n{message.content}')
+
+
+@ds.event
+async def on_guild_join(guild):
+    channel = guild.system_channel
+    if channel is not None:
+        await channel.send(f'[🚀] Привет! Для начала работы со мной пропишите команду /start!')
+
+
 @ds.slash_command(name='start', description="Регистрация Discord сервера")
-@commands.has_permissions(administrator=True)  # Ограничиваем команду только для администраторов
+@commands.has_permissions(administrator=True)
 async def start(interaction: disnake.ApplicationCommandInteraction):
+    examination = await db.get_server_name()
     server_id = [interaction.guild.id]
     user_id = interaction.user.id
     channel_id = interaction.channel.id
     server_name = [interaction.guild.name]
-    await interaction.send("[⚙️] Регистрация вашего Discord сервера...")
-    await db.start(server_id=server_id, channel_id=channel_id, user_id_discord=user_id, server_name=server_name)
-    await interaction.send("[✅] Ваш сервер успешно зарегистрирован!")
+    if server_name[0] in [name.strip("'") for name in examination]:
+        await interaction.send("[✅] Ваш сервер уже зарегистрирован!")
+    else:
+        await interaction.send("[⚙️] Регистрация вашего Discord сервера...")
+        await db.start(server_id=server_id, channel_id=channel_id, user_id_discord=user_id, server_name=server_name)
+        await interaction.send("[✅] Ваш сервер успешно зарегистрирован!")
 
 
 @start.error
@@ -220,7 +243,7 @@ async def name_autocomplete(interaction: disnake.ApplicationCommandInteraction, 
 async def dev(interaction: disnake.ApplicationCommandInteraction):
     embed = disnake.Embed(title="[👨🏻‍💻] О боте:", color=0x185200)
     embed.add_field(name="[🛠] Разработчик", value="@solarezzwhynot")
-    embed.add_field(name="[⚙️] Версия", value="1.0")
+    embed.add_field(name="[⚙️] Версия", value="1.1")
     embed.add_field(name="[💳] Поддержка копеечкой для хостинга", value="2200 7007 1699 4750")
     embed.set_thumbnail(url="https://i.pinimg.com/originals/f8/d0/bc/f8d0bc025046ab637a78a09598b905a7.png")
     await interaction.send(embed=embed)

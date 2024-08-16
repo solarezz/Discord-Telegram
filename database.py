@@ -138,27 +138,12 @@ class Database:
 
             return server_name
 
-    async def check_notifications(self, server_name):
+    async def check_notifications(self, server_id, user_id_telegram):
         async with aiosqlite.connect(self.db_name) as db:
-            # Получаем список всех таблиц в базе данных
-            async with db.execute("SELECT name FROM sqlite_master WHERE type='table';") as cursor:
-                tables = await cursor.fetchall()
-
-            notifications = []
-            server_id = 0
-
-            # Проходим по всем таблицам и пытаемся получить user_id_telegram
-            for (table_name,) in tables:
-                try:
-                    async with db.execute(f"SELECT notifications FROM [{table_name}] WHERE server_name = ?;",
-                                          (server_name,)) as cursor:
-                        rows = await cursor.fetchall()
-                        notifications.extend([row[0] for row in rows if row[0] is not None])
-                        server_id = table_name
-                except aiosqlite.Error as e:
-                    print(f"Ошибка при обработке таблицы {table_name}: {e}")
-
-            return notifications, server_id
+            async with db.execute(f'SELECT notifications FROM [{server_id}] WHERE user_id_telegram=?',
+                                  (user_id_telegram,)) as cursor:
+                result = await cursor.fetchone()
+                return result
 
     async def update_notif(self, notifications, user_id_tg, server_id):
         async with aiosqlite.connect(self.db_name) as db:
@@ -186,3 +171,21 @@ class Database:
                     print(f"Ошибка при обработке таблицы {table_name}: {e}")
 
             return user_ids
+
+    async def get_server_id(self, server_name):
+        async with aiosqlite.connect(self.db_name) as db:
+            # Получаем список всех таблиц в базе данных
+            async with db.execute("SELECT name FROM sqlite_master WHERE type='table';") as cursor:
+                tables = await cursor.fetchall()
+
+            # Перебираем все таблицы и ищем сервер
+            for (table_name,) in tables:
+                try:
+                    async with db.execute(f"SELECT * FROM [{table_name}] WHERE server_name = ?", (server_name,)) as cursor:
+                        row = await cursor.fetchone()
+                        if row:
+                            return table_name
+                except:
+                    pass
+
+        return "Сервер не найден."
