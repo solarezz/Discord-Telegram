@@ -92,7 +92,7 @@ async def process_switch_notifications(message: types.Message, state: FSMContext
 @dp.message_handler(commands=['sendall'])
 async def sendall(message: types.Message):
     if message.chat.id == 2023527964:
-        text_to_send = message.text[len('/sendall '):].strip()
+        text_send = message.get_args()
         ids = await db.output_ids_telegram_table()
         kb = [
             [
@@ -101,7 +101,7 @@ async def sendall(message: types.Message):
         ]
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, keyboard=kb)
         for user in ids:
-            await tg.send_message(user, f'{text_to_send}', reply_markup=markup)
+            await tg.send_message(user, f'```{text_send}```', reply_markup=markup, parse_mode='Markdown')
 
         await tg.send_message(message.chat.id, f'отправили всем [{ids}]')
     else:
