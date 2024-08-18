@@ -45,7 +45,7 @@ async def start_tg(message: types.Message):
         await tg.send_message(message.chat.id, "[✅] Вы успешно привязали свой аккаунт!")
     else:
         await db.input_ids_telegram_table(message.chat.id)
-        await message.reply('[👋] Привет! Перейдите по реферальной ссылке из Discord. (Подробнее /info - В DISCORD!)')
+        await message.reply('[👋] Привет! Перейдите по ссылке с привязкой из Discord. (Подробнее /info - В DISCORD!)')
 
 
 @dp.message_handler(commands=['notifications'])
