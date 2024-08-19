@@ -114,7 +114,7 @@ async def message_in_discord(message: types.Message):
     text_server = message.text
     server_name = await db.get_server_name()
     if text_server in server_name:
-        await message.answer(f'[✍🏻] Введите текст который хотите отправить на {text_server}:')
+        await message.answer(f'[✍🏻] Введите текст который хотите отправить на: {text_server}:')
         server_channel_id = await db.get_channel_id(server_name=text_server)
         await db.update_last_msg(user_telegram_id=message.chat.id, last_msg=server_channel_id[0])
     elif server_id != 0:
@@ -163,7 +163,7 @@ async def on_message(message):
             user_list.remove(userid)
             print(user_list)
         else:
-            await tg.send_message(userid, f'{message.author}:\n{message.content}')
+            await tg.send_message(userid, f'{message.author}:\n╰┈➤{message.content}')
 
 
 @ds.event
