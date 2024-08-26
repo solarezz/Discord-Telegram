@@ -189,3 +189,10 @@ class Database:
                     pass
 
         return "Сервер не найден."
+
+    async def search_id(self, firstname, server_id):
+        async with aiosqlite.connect(self.db_name) as db:
+            async with db.execute(f'SELECT user_id_telegram FROM [{server_id}] WHERE firstname=?',
+                                  (firstname,)) as cursor:
+                result = await cursor.fetchone()
+                return result[0]

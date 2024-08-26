@@ -9,9 +9,9 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.dispatcher import FSMContext
 
-ds_token = input('DS_token: ')
+ds_token = ''
 
-tg_token = input('tg_token: ')
+tg_token = ''
 
 intents = disnake.Intents.default().all()
 
@@ -224,7 +224,8 @@ async def stg(interaction: disnake.ApplicationCommandInteraction, name: str, mes
         user = interaction.user
         user_id = [f'{user[2]}' for user in users]
         await interaction.send(f"[📨] Вы отправили сообщение пользователю - {name}!")
-        await tg.send_message(user_id[0], f'[{message}] - от {user.name}')
+        tgID = await db.search_id(firstname=name, server_id=interaction.guild.id)
+        await tg.send_message(tgID, f'[{message}] - от {user.name}')
         await db.update_last_msg(user_telegram_id=user_id[0], last_msg=channel_id)
     else:
         await interaction.send(f"[❌] Вы не привязали свой аккаунт Telegram! Введите команду /info!", ephemeral=True)
